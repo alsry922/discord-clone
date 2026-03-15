@@ -1,0 +1,29 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: discord-postgres
+    restart: unless-stopped
+    # no - 자동 재시작 안함(기본값) 수등올 docker start 필요
+    # on-failure - 컨테이너 비정상 종료(에러)됐을 떄만 재동 재시작
+    # always - 어떤 이유든 항상 재시작. PC 재부팅 후 Docker Desktop 뜨면 자동 시작
+    # unless-stopped - 항상 재시작 하지만, docker stop으로 직접 중지한 경우 재시작 안함.
+    ports:
+      - '5432:5432'
+    env_file:
+      - ./server/.env
+    environment:
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_DATABASE}
+    # 서비스 안 volumes
+    # 이 컨테이너의 /var/lib/postgresql/data 경로를 postgres-data라는 볼륨에 연결
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+# 최상위 volumes
+# 이 프로젝트에서 postgres-data라는 named volume을 만들어서 관리
+# 최상위에 선언하지 않으면 Docker가 볼륨을 인식하지 못해요.
+# named volume을 쓰는 이유는 Docker가 데이터를 직접 관리하기 때문에,
+# 컨테이너를 삭제해도 DB 데이터가 사라지지 않아요.
+# docker volume rm postgres-data로 명시적으로 지워야만 사라져요.
+volumes:
+  postgres-data:
