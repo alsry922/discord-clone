@@ -49,6 +49,10 @@ export const LoginPage = () => {
           <label className="mb-2 block text-xs font-bold text-[#b5bac1] uppercase">
             이메일
           </label>
+          {/*필드를 react-hook-form에 등록.*/}
+          {/*register 함수가 input에 onChange, onBlur, name, ref를 붙여줌. 두 번째 인자가 그 input에 적용할 유효성 검사 규칙*/}
+          {/*일반적인 방식은 ref가 input에 직접 연결되지만, DOM ref 없이 사용하면 setValue로 수동으로 값을 업데이트 해야함.*/}
+          {/*angular reactive form setValue와 ngModel 관계와 비슷한 것 같음.*/}
           <input
             type="email"
             {...register('email', {
