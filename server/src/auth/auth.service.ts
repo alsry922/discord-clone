@@ -10,6 +10,7 @@ import { User } from '../users/entities/user.entity';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import { JwtPayload } from './interfaces/jwt-payload.interface';
 
 @Injectable()
 export class AuthService {
@@ -55,8 +56,17 @@ export class AuthService {
         '이메일 또는 비밀번호가 올바르지 않습니다.',
       );
     }
-
-    const token = this.jwtService.sign({ sub: user.id, email: user.email });
+    // JWT 표준 claim(클레임), payload에 들어감.
+    // - sub: subject, 토큰의 주체(누구의 토큰인지)를 나타냄
+    //    - 보통 user id
+    // - iss: issuer, 토큰 발급자
+    // - exp: expiration, 만료 시간
+    // - aud: audience, 토큰 대상자
+    //    - 누가 사용할 수 있는지 나타냄(모바일 전용, 웹 전용)
+    const token = this.jwtService.sign<JwtPayload>({
+      sub: user.id,
+      email: user.email,
+    });
 
     return { accessToken: token };
   }

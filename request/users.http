@@ -1,0 +1,8 @@
+### 회원 목록
+POST http://localhost:3000/users
+Content-Type: application/json
+
+### 토큰 있을 때
+GET http://localhost:3000/users
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjIsImVtYWlsIjoidGVzdDJAdGVzdC5jb20iLCJpYXQiOjE3NzQ0NDkyNDcsImV4cCI6MTc3NTA1NDA0N30.mqPVohzKO4wSGNexIpAQ_jGpH6z-cCcDik5UecSVJkc
