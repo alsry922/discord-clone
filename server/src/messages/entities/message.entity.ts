@@ -9,9 +9,10 @@ import {
 } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
 import { Channel } from '../../channels/entities/channel.entity';
+import { BaseEntity } from '../../common/base.entity';
 
 @Entity({ name: 'messages' })
-export class Message {
+export class Message extends BaseEntity {
   @PrimaryGeneratedColumn()
   id: number;
 
@@ -29,13 +30,4 @@ export class Message {
 
   @Column()
   channelId: number;
-
-  @CreateDateColumn()
-  createdAt: Date;
-
-  @UpdateDateColumn()
-  updatedAt: Date;
-
-  @DeleteDateColumn()
-  deletedAt: Date;
 }

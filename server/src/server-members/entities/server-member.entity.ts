@@ -25,6 +25,6 @@ export class ServerMember {
   @Column()
   serverId: number;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   joinedAt: Date;
 }

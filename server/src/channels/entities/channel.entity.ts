@@ -9,9 +9,10 @@ import {
 } from 'typeorm';
 import { Server } from '../../servers/entities/server.entity';
 import { ChannelType } from '../enums/channel-type.enum';
+import { BaseEntity } from '../../common/base.entity';
 
 @Entity('channels')
-export class Channel {
+export class Channel extends BaseEntity {
   @PrimaryGeneratedColumn()
   id: number;
 
@@ -31,13 +32,4 @@ export class Channel {
 
   @Column()
   serverId: number;
-
-  @CreateDateColumn()
-  createdAt: Date;
-
-  @UpdateDateColumn()
-  updatedAt: Date;
-
-  @DeleteDateColumn()
-  deletedAt: Date;
 }
