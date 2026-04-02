@@ -12,7 +12,10 @@ import { CreateChannelDto } from './dto/create-channel.dto';
 import { UpdateChannelDto } from './dto/update-channel.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
+@ApiTags('channels')
+@ApiBearerAuth()
 @Controller('servers/:serverId/channels')
 export class ChannelsController {
   constructor(private readonly channelsService: ChannelsService) {}

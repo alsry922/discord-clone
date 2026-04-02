@@ -14,7 +14,10 @@ import { UpdateServerDto } from './dto/update-server.dto';
 // 위와 같이 쓰면 export = e 가 allowSyntheticDefaultImports 옵션 때문에 e 함수를 Request라는 이름으로 가져오게 됨.
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
+@ApiTags('servers')
+@ApiBearerAuth()
 @Controller('servers')
 export class ServersController {
   constructor(private readonly serversService: ServersService) {}
@@ -27,6 +30,7 @@ export class ServersController {
     return this.serversService.create(user.sub, createServerDto);
   }
 
+  @ApiOperation({ summary: '서버 목록 조회' })
   @Get()
   findAll(@CurrentUser() user: JwtPayload) {
     return this.serversService.findAll(user.sub);
