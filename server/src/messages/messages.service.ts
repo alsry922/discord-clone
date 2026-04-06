@@ -1,11 +1,20 @@
 import { Injectable } from '@nestjs/common';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { UpdateMessageDto } from './dto/update-message.dto';
+import { Repository } from 'typeorm';
+import { Message } from './entities/message.entity';
+import { InjectRepository } from '@nestjs/typeorm';
 
 @Injectable()
 export class MessagesService {
+  constructor(
+    @InjectRepository(Message)
+    private readonly messagesRepository: Repository<Message>,
+  ) {}
   create(createMessageDto: CreateMessageDto) {
-    return 'This action adds a new message';
+    const message = this.messagesRepository.create(createMessageDto);
+    // fixme: 엔티티를 그대로 반환?
+    return this.messagesRepository.save(message);
   }
 
   findAll() {

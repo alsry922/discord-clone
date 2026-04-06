@@ -2,12 +2,14 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { CorsOptions } from '@nestjs/common/interfaces/external/cors-options.interface';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  app.enableCors({
+  const corsOptions: CorsOptions = {
     origin: 'http://localhost:5173',
-  });
+  };
+  app.enableCors(corsOptions);
   app.useGlobalPipes(
     new ValidationPipe({
       // Note DTO에 정의 안 된 property 자동으로 제거

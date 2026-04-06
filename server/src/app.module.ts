@@ -12,6 +12,7 @@ import { MessagesModule } from './messages/messages.module';
 import { AuthModule } from './auth/auth.module';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtGuard } from './auth/guards/jwt.guard';
+import { ChatModule } from './chat/chat.module';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { JwtGuard } from './auth/guards/jwt.guard';
     ChannelsModule,
     MessagesModule,
     AuthModule,
+    ChatModule,
   ],
   controllers: [AppController],
   providers: [
