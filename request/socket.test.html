@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>WebSocket Test</title>
+  <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+  <style>
+      body { font-family: monospace; max-width: 700px; margin: 40px auto; padding: 0 20px; background: #1a1a1a; color: #eee; }
+      h2 { color: #7289da; }
+      label { display: block; margin-top: 12px; font-size: 13px; color: #aaa; }
+      input { width: 100%; padding: 8px; margin-top: 4px; background: #2a2a2a; border: 1px solid #444; color: #eee; border-radius: 4px; box-sizing: border-box; }
+      button { margin-top: 8px; padding: 8px 16px; background: #7289da; color: white; border: none; border-radius: 4px; cursor: pointer; }
+      button:hover { background: #5b6eae; }
+      button:disabled { background: #444; cursor: not-allowed; }
+      #log { margin-top: 24px; background: #111; border: 1px solid #333; border-radius: 4px; padding: 12px; height: 300px; overflow-y: auto; font-size: 13px; }
+      .log-in  { color: #43b581; }
+      .log-out { color: #f04747; }
+      .log-sys { color: #faa61a; }
+      hr { border-color: #333; margin: 20px 0; }
+  </style>
+</head>
+<body>
+<h2>🔌 Socket.IO Test</h2>
+
+<label>JWT Token (Bearer 포함)</label>
+<input id="token" type="text" placeholder="Bearer eyJ..." />
+<button id="btnConnect">Connect</button>
+<button id="btnDisconnect" disabled>Disconnect</button>
+
+<hr />
+
+<label>Channel ID</label>
+<input id="channelId" type="number" value="1" />
+<button id="btnJoin" disabled>joinChannel</button>
+
+<hr />
+
+<label>Message</label>
+<input id="content" type="text" placeholder="Hello!" />
+<button id="btnSend" disabled>sendMessage</button>
+
+<hr />
+
+<div id="log"></div>
+
+<script>
+  let socket = null;
+
+  function log(msg, type = 'sys') {
+    const div = document.getElementById('log');
+    const line = document.createElement('div');
+    line.className = `log-${type}`;
+    line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+    div.appendChild(line);
+    div.scrollTop = div.scrollHeight;
+  }
+
+  document.getElementById('btnConnect').addEventListener('click', () => {
+    const token = document.getElementById('token').value.trim();
+    if (!token) { log('토큰을 입력하세요.', 'out'); return; }
+
+    socket = io('http://localhost:3000', { auth: { token } });
+
+    socket.on('connect', () => {
+      log(`연결 성공 (id: ${socket.id})`, 'in');
+      document.getElementById('btnConnect').disabled = true;
+      document.getElementById('btnDisconnect').disabled = false;
+      document.getElementById('btnJoin').disabled = false;
+      document.getElementById('btnSend').disabled = false;
+    });
+
+    socket.on('connect_error', (err) => {
+      log(`연결 실패: ${err.message}`, 'out');
+    });
+
+    socket.on('disconnect', () => {
+      log('연결 종료', 'out');
+      document.getElementById('btnConnect').disabled = false;
+      document.getElementById('btnDisconnect').disabled = true;
+      document.getElementById('btnJoin').disabled = true;
+      document.getElementById('btnSend').disabled = true;
+    });
+
+    socket.on('newMessage', (msg) => {
+      log(`newMessage 수신: ${JSON.stringify(msg)}`, 'in');
+    });
+  });
+
+  document.getElementById('btnDisconnect').addEventListener('click', () => {
+    socket?.disconnect();
+  });
+
+  document.getElementById('btnJoin').addEventListener('click', () => {
+    const channelId = Number(document.getElementById('channelId').value);
+    socket.emit('joinChannel', { channelId });
+    log(`joinChannel emit → channelId: ${channelId}`, 'sys');
+  });
+
+  document.getElementById('btnSend').addEventListener('click', () => {
+    const channelId = Number(document.getElementById('channelId').value);
+    const content = document.getElementById('content').value.trim();
+    if (!content) { log('메시지를 입력하세요.', 'out'); return; }
+    socket.emit('sendMessage', { channelId, content });
+    log(`sendMessage emit → ${JSON.stringify({ channelId, content })}`, 'sys');
+  });
+</script>
+</body>
+</html>

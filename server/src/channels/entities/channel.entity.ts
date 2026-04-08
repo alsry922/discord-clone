@@ -1,12 +1,4 @@
-import {
-  Column,
-  CreateDateColumn,
-  DeleteDateColumn,
-  Entity,
-  ManyToOne,
-  PrimaryGeneratedColumn,
-  UpdateDateColumn,
-} from 'typeorm';
+import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 import { Server } from '../../servers/entities/server.entity';
 import { ChannelType } from '../enums/channel-type.enum';
 import { BaseEntity } from '../../common/base.entity';

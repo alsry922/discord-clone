@@ -16,7 +16,7 @@ import { Channel } from '../channels/entities/channel.entity';
 export class ServersService {
   constructor(
     // FIXME: InjectRepository가 뭐지? jpa처럼 interface를 따로 나누어야 하나?
-    //  이대로 쓰면 테스트 작성에는 불편한가?
+    // note: 나중에 필요하면 리팩토링
     @InjectRepository(Server)
     private readonly serverRepository: Repository<Server>,
     @InjectRepository(ServerMember)
