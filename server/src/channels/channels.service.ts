@@ -1,8 +1,4 @@
-import {
-  ForbiddenException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { CreateChannelDto } from './dto/create-channel.dto';
 import { UpdateChannelDto } from './dto/update-channel.dto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -10,6 +6,10 @@ import { Channel } from './entities/channel.entity';
 import { Repository } from 'typeorm';
 import { Server } from '../servers/entities/server.entity';
 import { ServerMember } from '../server-members/entities/server-member.entity';
+import { ChannelException } from './exceptions/channel.exception';
+import { ServerException } from '../servers/exceptions/server.exception';
+import { plainToInstance } from 'class-transformer';
+import { ChannelResponseDto } from './dto/channel-response.dto';
 
 @Injectable()
 export class ChannelsService {
@@ -30,14 +30,13 @@ export class ChannelsService {
     const server = await this.serverRepository.findOne({
       where: { id: serverId },
     });
-    // FIXME: 에러 코드 정의?
+
     if (!server) {
-      throw new NotFoundException('서버를 찾을 수 없습니다.');
+      throw ServerException.notFound();
     }
     // owner인지 확인
-    // FIXME: 에러 코드 정의?
     if (server.ownerId !== userId) {
-      throw new ForbiddenException('서버 소유자만 가능합니다.');
+      throw ServerException.forbidden();
     }
     // 채널 생성 후 저장
     const channel = this.channelRepository.create({
@@ -45,8 +44,7 @@ export class ChannelsService {
       serverId,
     });
     const savedChannel = await this.channelRepository.save(channel);
-    // FIXME: ENTITY 그대로 반환?
-    return savedChannel;
+    return plainToInstance(ChannelResponseDto, savedChannel);
   }
 
   async findAll(serverId: number, userId: number) {
@@ -55,22 +53,22 @@ export class ChannelsService {
       where: { id: serverId },
     });
     if (!server) {
-      throw new NotFoundException('서버를 찾을 수 없습니다.');
+      throw ServerException.notFound();
     }
     // 서버 멤버인지 확인
     const serverMember = await this.serverMemberRepository.findOne({
       where: { serverId: serverId, userId: userId },
     });
+
     if (!serverMember) {
-      throw new ForbiddenException('서버 멤버만 가능합니다.');
+      throw ServerException.notMember();
     }
     // 채널 목록 반환
     const channels = await this.channelRepository.find({
       where: { serverId: serverId },
     });
 
-    // FIXME: ENTITY 그대로 반환?
-    return channels;
+    return plainToInstance(ChannelResponseDto, channels);
   }
 
   async findOne(serverId: number, id: number, userId: number) {
@@ -79,25 +77,20 @@ export class ChannelsService {
       where: { id: serverId },
     });
     if (!server) {
-      throw new NotFoundException('서버를 찾을 수 없습니다.');
+      throw ServerException.notFound();
     }
     // 서버 멤버인지 확인
     const serverMember = await this.serverMemberRepository.findOne({
       where: { serverId: serverId, userId: userId },
     });
     if (!serverMember) {
-      throw new ForbiddenException('서버 멤버만 가능합니다.');
+      throw ServerException.notMember();
     }
     // 존재하는 채널인지 확인
-    const channel = await this.channelRepository.findOne({
-      where: { id },
-    });
-    if (!channel) {
-      throw new NotFoundException('채널을 찾을 수 없습니다.');
-    }
+    const channel = await this.findChannelOrFail(id);
+
     // 채널 찾아서 반환
-    // FIXME: ENTITY 그대로 반환?
-    return channel;
+    return plainToInstance(ChannelResponseDto, channel);
   }
 
   async update(
@@ -110,27 +103,22 @@ export class ChannelsService {
     const server = await this.serverRepository.findOne({
       where: { id: serverId },
     });
-    // FIXME: 에러 코드 정의?
     if (!server) {
-      throw new NotFoundException('서버를 찾을 수 없습니다.');
+      throw ServerException.notFound();
     }
     // 서버 소유자인지 확인
-    // FIXME: 에러 코드 정의?
     if (server.ownerId !== userId) {
-      throw new ForbiddenException('서버 소유자만 가능합니다.');
+      throw ServerException.forbidden();
     }
     // 존재하는 채널인지 확인
-    const channel = await this.channelRepository.findOne({
-      where: { id },
-    });
-    if (!channel) {
-      throw new NotFoundException('채널을 찾을 수 없습니다.');
-    }
-    // 채널 수정하고 반환
+    const channel = await this.findChannelOrFail(id);
+
+    // NOTE: Object.assign은 얕은 복사라 중첩 객체가 생기면 병합이 아닌 교체가 일어남.
+    //  그 때는 필드별 수동 할당이나 lodash.merge 사용 고려
     Object.assign(channel, updateChannelDto);
-    // FIXME: ENTITY 그대로 반환?
     // NOTE: save는 entity에 id가 있으면 update, id가 없으면 insert로 동작
-    return this.channelRepository.save(channel);
+    const updatedChannel = await this.channelRepository.save(channel);
+    return plainToInstance(ChannelResponseDto, updatedChannel);
   }
 
   async remove(serverId: number, id: number, userId: number) {
@@ -138,24 +126,27 @@ export class ChannelsService {
     const server = await this.serverRepository.findOne({
       where: { id: serverId },
     });
-    // FIXME: 에러 코드 정의?
     if (!server) {
-      throw new NotFoundException('서버를 찾을 수 없습니다.');
+      throw ServerException.notFound();
     }
     // 서버 소유자인지 확인
-    // FIXME: 에러 코드 정의?
     if (server.ownerId !== userId) {
-      throw new ForbiddenException('서버 소유자만 가능합니다.');
+      throw ServerException.forbidden();
     }
     // 존재하는 채널인지 확인
+    const channel = await this.findChannelOrFail(id);
+
+    const removedChannel = await this.channelRepository.softRemove(channel);
+    return removedChannel.id;
+  }
+
+  private async findChannelOrFail(channelId: number) {
     const channel = await this.channelRepository.findOne({
-      where: { id },
+      where: { id: channelId },
     });
     if (!channel) {
-      throw new NotFoundException('채널을 찾을 수 없습니다.');
+      throw ChannelException.notFound();
     }
-    await this.channelRepository.softRemove(channel);
-    // FIXME: ENTITY 그대로 반환?
     return channel;
   }
 }

@@ -1,20 +1,20 @@
-import {
-  ForbiddenException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { CreateServerDto } from './dto/create-server.dto';
 import { UpdateServerDto } from './dto/update-server.dto';
 import { Server } from './entities/server.entity';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'node:crypto';
 import { ServerMember } from '../server-members/entities/server-member.entity';
 import { Channel } from '../channels/entities/channel.entity';
+import { ServerException } from './exceptions/server.exception';
+import { plainToInstance } from 'class-transformer';
+import { ServerResponseDto } from './dto/server-response.dto';
 
 @Injectable()
 export class ServersService {
   constructor(
+    private readonly dataSource: DataSource,
     // FIXME: InjectRepository가 뭐지? jpa처럼 interface를 따로 나누어야 하나?
     // note: 나중에 필요하면 리팩토링
     @InjectRepository(Server)
@@ -25,36 +25,35 @@ export class ServersService {
     private readonly channelRepository: Repository<Channel>,
   ) {}
   async create(userId: number, createServerDto: CreateServerDto) {
-    // FIXME: transaction 처리?
-    const server = this.serverRepository.create({
-      ...createServerDto,
-      ownerId: userId,
-      // uuid v4 (랜덤 기반) 생성
-      inviteCode: randomUUID(),
+    const server = await this.dataSource.transaction(async (manager) => {
+      const server = this.serverRepository.create({
+        ...createServerDto,
+        ownerId: userId,
+        // uuid v4 (랜덤 기반) 생성
+        inviteCode: randomUUID(),
+      });
+      await manager.save(server);
+
+      const serverMember = this.serverMemberRepository.create({
+        userId,
+        serverId: server.id,
+      });
+      await manager.save(serverMember);
+
+      const channel = this.channelRepository.create({
+        name: '일반',
+        serverId: server.id,
+      });
+
+      await manager.save(channel);
+      return server;
     });
-
-    await this.serverRepository.save(server);
-
-    const serverMember = this.serverMemberRepository.create({
-      userId,
-      serverId: server.id,
-    });
-
-    await this.serverMemberRepository.save(serverMember);
-
-    const channel = this.channelRepository.create({
-      name: '일반',
-      serverId: server.id,
-    });
-
-    await this.channelRepository.save(channel);
-
-    // FIXME: 서비스에서 엔티티를 그대로 반환?
-    return server;
+    return plainToInstance(ServerResponseDto, server);
   }
 
   async findAll(userId: number) {
-    // .createQueryBuilder('server')
+    // note
+    //  .createQueryBuilder('server')
     //     .select(['server.id', 'server.name'])   // 특정 컬럼만 조회
     //     .leftJoin(...)                          // LEFT JOIN
     //     .innerJoin(...)                         // INNER JOIN
@@ -69,19 +68,18 @@ export class ServersService {
     //     .getCount()                             // COUNT
 
     // 내가 속한 서버 목록
-    // FIXME: 서비스에서 엔티티를 그대로 반환?
-    return (
-      this.serverRepository
-        // servers alias server
-        .createQueryBuilder('server')
-        // server_members alias member
-        .innerJoin('server_members', 'member', 'member.server_id = server.id')
-        .where('member.user_id = :userId', { userId })
-        .getMany()
-    );
+    const servers = await this.serverRepository
+      // servers alias server
+      .createQueryBuilder('server')
+      // server_members alias member
+      .innerJoin('server_members', 'member', 'member.server_id = server.id')
+      .where('member.user_id = :userId', { userId })
+      .getMany();
+    return plainToInstance(ServerResponseDto, servers);
   }
 
   async findOne(id: number, userId: number) {
+    //note
     // find, findOne 같은 조회 옵션 사용이 가능함.
     // findOne은 LIMIT 1이 붙어서 단건 반환이 됨.
     // this.serverRepository.find({
@@ -92,53 +90,42 @@ export class ServersService {
     //   skip: 0, // OFFSET
     //   take: 10, // LIMIT
     // });
-    const server = await this.serverRepository.findOne({
-      where: { id },
-    });
-
-    // FIXME: 에러 종류(코드) 정의?
-    // FIXME: 반복되는 서버를 찾고, 있는지 확인하는 작업 리팩토링?
-    if (!server) {
-      throw new NotFoundException('서버를 찾을 수 없습니다.');
-    }
+    const server = await this.findServerOrFail(id);
 
     // 서버 멤버인지 확인
     const member = await this.serverMemberRepository.findOne({
       where: { serverId: id, userId },
     });
     if (!member) {
-      throw new ForbiddenException('이 서버의 멤버가 아닙니다.');
+      throw ServerException.notMember();
     }
-    // FIXME: 서비스에서 엔티티를 그대로 반환?
-    return server;
+    return plainToInstance(ServerResponseDto, server);
   }
 
   async update(id: number, userId: number, updateServerDto: UpdateServerDto) {
-    const server = await this.serverRepository.findOne({ where: { id } });
-    if (!server) {
-      throw new NotFoundException('서버를 찾을 수 없습니다.');
-    }
+    const server = await this.findServerOrFail(id);
     if (server.ownerId !== userId) {
-      throw new ForbiddenException('서버 소유자만 수정할 수 있습니다.');
+      throw ServerException.forbidden();
     }
-
+    // NOTE: Object.assign(target, source): source의 프로퍼티를 target에 덮어쓰기(프로퍼티가 있든 없든 무조건 덮어씀)
+    //  얕은 복사라 중첩 객체가 생기면 병합이 아닌 교체가 일어남.
+    //  그 때는 필드별 수동 할당이나 lodash.merge 사용 고려
     Object.assign(server, updateServerDto);
 
-    // FIXME: 서비스에서 엔티티를 그대로 반환?
-    return this.serverRepository.save(server);
+    const updatedServer = await this.serverRepository.save(server);
+    return plainToInstance(ServerResponseDto, updatedServer);
   }
 
   async remove(id: number, userId: number) {
-    const server = await this.serverRepository.findOne({ where: { id } });
-    if (!server) {
-      throw new NotFoundException('서버를 찾을 수 없습니다.');
-    }
+    const server = await this.findServerOrFail(id);
+
     if (server.ownerId !== userId) {
-      throw new ForbiddenException('서버의 소유자만 삭제할 수 있습니다');
+      throw ServerException.forbidden();
     }
 
-    // FIXME: 서비스에서 엔티티를 그대로 반환?
-    await this.serverRepository.softRemove(server);
+    const removedServer = await this.serverRepository.softRemove(server);
+    // note 지워지는 건 특별한 response 반환 대신 지워진 엔티티의 id만 제공
+    return removedServer.id;
   }
 
   async join(inviteCode: string, userId: number) {
@@ -146,16 +133,16 @@ export class ServersService {
       where: { inviteCode },
     });
     if (!server) {
-      throw new NotFoundException('서버를 찾을 수 없습니다.');
+      throw ServerException.notFound();
     }
 
     const existingMember = await this.serverMemberRepository.findOne({
       where: { serverId: server.id, userId },
     });
 
-    // FIXME: 서비스에서 엔티티를 그대로 반환?
+    // FIXME: 이미 가입한 회원이면 server를 return할 게 아니라 에러를 반환해야 하나?
     if (existingMember) {
-      return server;
+      return plainToInstance(ServerResponseDto, server);
     }
 
     const member = this.serverMemberRepository.create({
@@ -164,7 +151,18 @@ export class ServersService {
     });
     await this.serverMemberRepository.save(member);
 
-    // FIXME: 서비스에서 엔티티를 그대로 반환?
+    return plainToInstance(ServerResponseDto, server);
+  }
+
+  private async findServerOrFail(serverId: number): Promise<Server> {
+    const server = await this.serverRepository.findOne({
+      where: { id: serverId },
+    });
+
+    if (!server) {
+      throw ServerException.notFound();
+    }
+
     return server;
   }
 }

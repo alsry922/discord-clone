@@ -258,7 +258,7 @@ describe('ServersService', () => {
       await service.remove(id, userId);
       // Assert
       expect(mockServerRepo.softRemove).toHaveBeenCalledWith(
-        // note: toHaveBeenCalledWith에 일반 객체를 넣으면 완전 일치(.toEqaul 처럼 모든 프로퍼티가 똑같아야 통과)를 검증함
+        // note: toHaveBeenCalledWith에 일반 객체를 넣으면 완전 일치(toEqual 처럼 모든 프로퍼티가 똑같아야 통과)를 검증함
         expect.objectContaining({ id, ownerId: 1 }),
       );
     });
