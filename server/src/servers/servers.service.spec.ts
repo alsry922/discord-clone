@@ -8,13 +8,32 @@ import { CreateServerDto } from './dto/create-server.dto';
 import { randomUUID } from 'node:crypto';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { UpdateServerDto } from './dto/update-server.dto';
-import { mock } from 'node:test';
+import { DataSource } from 'typeorm';
+import { plainToInstance } from 'class-transformer';
+import { ServerResponseDto } from './dto/server-response.dto';
+
+const mockManager = {
+  save: jest.fn(),
+};
+
+const mockDataSource = {
+  transaction: jest.fn(),
+};
+
+const mockQueryBuilder = {
+  innerJoin: jest.fn().mockReturnThis(),
+  where: jest.fn().mockReturnThis(),
+  getMany: jest.fn(),
+};
 
 const mockServerRepo = {
+  // note: jest.fn() -> 아무것도 안 하는 가짜 함수, 기본 반환값은 undefined
+  //  호출 기록을 추적함(몇 번 호출됐는지, 어떤 인자로 호출됐는지 등)
   create: jest.fn(),
   save: jest.fn(),
   findOne: jest.fn(),
   softRemove: jest.fn(),
+  createQueryBuilder: jest.fn().mockReturnValue(mockQueryBuilder),
 };
 
 const mockServerMemberRepo = {
@@ -28,6 +47,19 @@ const mockChannelRepo = {
   save: jest.fn(),
 };
 
+mockManager.save.mockImplementation((entity) => Promise.resolve(entity));
+
+mockDataSource.transaction.mockImplementation(
+  (cb: (manager: typeof mockManager) => Promise<unknown>) => cb(mockManager),
+);
+
+// note: jest.spyOn(object, 'methodName') -> 이미 존재하는 메소드를 감시함
+//  원래 구현을 그대로 실행하면서 호출 기록만 추적함.
+//  const obj = { greet: () => 'hello' };
+//  jest.spyOn(obj, 'greet');
+//  obj.greet(); // 'hello' — 원래 동작 그대로
+//  expect(obj.greet).toHaveBeenCalled(); // 추적은 됨
+
 jest.mock('node:crypto', () => ({
   randomUUID: jest.fn().mockReturnValue('fixed-uuid'),
 }));
@@ -37,9 +69,11 @@ describe('ServersService', () => {
 
   beforeEach(async () => {
     // note: clearAllMocks는 호출 기록만 초기화 함
-    // jest.clearAllMocks();
     // note: resetAllMocks는 설정한 반환값/구현까지 초기화
-    jest.resetAllMocks();
+    jest.clearAllMocks();
+    // note: jest.fn().mockImpelmentation() -> 가짜 함수에 실제 동작을 부여함
+    //  const fn = jest.fn().mockImplementation((x) => x * 2);
+    //  fn(3); // 6
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -56,6 +90,10 @@ describe('ServersService', () => {
           provide: getRepositoryToken(Channel),
           useValue: mockChannelRepo,
         },
+        {
+          provide: DataSource,
+          useValue: mockDataSource,
+        },
       ],
     }).compile();
 
@@ -64,30 +102,24 @@ describe('ServersService', () => {
 
   describe('create 메소드 테스트', () => {
     it('서버를 생성한다.', async () => {
-      // Arrange (준비)
+      // Arrange
       const userId = 1;
-      const createServerDto: CreateServerDto = {
-        name: '테스트 채널',
-      };
+      const createServerDto: CreateServerDto = { name: '테스트 서버' };
 
       mockServerRepo.create.mockReturnValue({
         id: 1,
-        icon: null,
         name: createServerDto.name,
         inviteCode: randomUUID(),
         ownerId: userId,
       });
-
       mockServerMemberRepo.create.mockReturnValue({
         id: 1,
         userId,
         serverId: 1,
       });
-
       mockChannelRepo.create.mockReturnValue({
         id: 1,
         name: '일반',
-        type: 'text',
         serverId: 1,
       });
 
@@ -95,8 +127,7 @@ describe('ServersService', () => {
       const server = await service.create(userId, createServerDto);
 
       // Assert
-      expect(server.id).toBe(1);
-      expect(server.inviteCode).toBe('fixed-uuid');
+      expect(mockDataSource.transaction).toHaveBeenCalled();
       expect(mockServerRepo.create).toHaveBeenCalledWith({
         ...createServerDto,
         ownerId: userId,
@@ -104,12 +135,13 @@ describe('ServersService', () => {
       });
       expect(mockServerMemberRepo.create).toHaveBeenCalledWith({
         userId,
-        serverId: server.id,
+        serverId: 1,
       });
       expect(mockChannelRepo.create).toHaveBeenCalledWith({
         name: '일반',
-        serverId: server.id,
+        serverId: 1,
       });
+      expect(server.id).toBe(1);
     });
   });
 
@@ -157,6 +189,37 @@ describe('ServersService', () => {
 
       // Assert
       expect(server.id).toBe(1);
+    });
+  });
+
+  describe('findAll 테스트', () => {
+    it('회원이 속한 모든 서버 목록을 가져온다.', async () => {
+      // Arrange
+      const userId = 1;
+      const mockServers = [
+        { id: 1, name: '서버1', ownerId: 1, inviteCode: 'fixed-uuid' },
+        { id: 2, name: '서버2', ownerId: 2, inviteCode: 'fixed-uuid' },
+      ];
+      mockQueryBuilder.getMany.mockResolvedValue(mockServers);
+      // Act
+      const result = await service.findAll(userId);
+
+      // Assertion
+      expect(result).toEqual(plainToInstance(ServerResponseDto, mockServers));
+      expect(mockServerRepo.createQueryBuilder).toHaveBeenCalledWith('server');
+
+      expect(mockQueryBuilder.innerJoin).toHaveBeenCalledWith(
+        'server_members',
+        'member',
+        'member.server_id = server.id',
+      );
+
+      expect(mockQueryBuilder.where).toHaveBeenCalledWith(
+        expect.stringContaining('user_id'),
+        { userId },
+      );
+
+      expect(mockQueryBuilder.getMany).toHaveBeenCalled();
     });
   });
 

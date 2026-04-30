@@ -140,7 +140,6 @@ export class ServersService {
       where: { serverId: server.id, userId },
     });
 
-    // FIXME: 이미 가입한 회원이면 server를 return할 게 아니라 에러를 반환해야 하나?
     if (existingMember) {
       return plainToInstance(ServerResponseDto, server);
     }
