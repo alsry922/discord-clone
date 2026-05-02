@@ -1,8 +1,4 @@
-import {
-  ConflictException,
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -11,6 +7,7 @@ import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
+import { AuthException } from './exceptions/auth.exception';
 
 @Injectable()
 export class AuthService {
@@ -26,7 +23,7 @@ export class AuthService {
       where: { email },
     });
     if (existingUser) {
-      throw new ConflictException('이미 사용 중인 이메일입니다.');
+      throw AuthException.conflict();
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -45,16 +42,12 @@ export class AuthService {
 
     const user = await this.userRepository.findOne({ where: { email } });
     if (!user) {
-      throw new UnauthorizedException(
-        '이메일 또는 비밀번호가 올바르지 않습니다.',
-      );
+      throw AuthException.invalidCredentials();
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
-      throw new UnauthorizedException(
-        '이메일 또는 비밀번호가 올바르지 않습니다.',
-      );
+      throw AuthException.invalidCredentials();
     }
     // JWT 표준 claim(클레임), payload에 들어감.
     // - sub: subject, 토큰의 주체(누구의 토큰인지)를 나타냄
