@@ -7,6 +7,7 @@ node_modules
 
 # IDE
 .idea
+.claude/settings.local.json
 
 # 빌드 결과물
 dist
