@@ -3,7 +3,7 @@
 > Update this file at the end of each session.
 > Record what was done and what comes next.
 
-Last updated: 2026-05-03
+Last updated: 2026-05-12
 
 ---
 
@@ -24,27 +24,25 @@ Last updated: 2026-05-03
 - Unit tests — ServersService (all passing)
 - Exception handling — applied in `servers.service.ts` and `channels.service.ts`
 - Swagger (`@nestjs/swagger`) added
+- Response DTO implementation
+    - `servers.service.ts`, `channels.service.ts` 모두 `plainToInstance`로 DTO 반환
+    - `@Expose()` 데코레이터 없이 DTO에 노출할 필드만 정의
+    - `ClassSerializerInterceptor` 글로벌 등록 제거
+    - `SerializeInterceptor` 커스텀 인터셉터 방식 채택하지 않음
+    - 결정 근거: 서비스가 DTO 반환 책임을 가져야 레이어 경계가 명확하고 DDD 전환 시 유리
+- Unit tests — ChannelsService (all passing)
+- Unit tests — AuthService register (all passing)
+    - `jest.mock('bcrypt', () => ({ hash: jest.fn(), compare: jest.fn() }))` 팩토리 방식으로 bcrypt 모킹
+    - bcrypt mock 호출 시 `(bcrypt.hash as jest.Mock)` 타입 단언 사용
 
 ### Next Task
 
-**Response DTO implementation** (top priority)
-
-Decided approach: custom `SerializeInterceptor` + `@Serialize(DtoClass)` decorator + `plainToInstance` + `@Expose()`
-
-Implementation order:
-1. `common/interceptors/serialize.interceptor.ts` — calls `plainToInstance`
-2. `@Serialize()` custom decorator
-3. `ServerResponseDto` — only `@Expose()` fields included in response
-4. `ChannelResponseDto`
-5. Apply `@Serialize()` on controllers
-6. Services continue returning entities as-is (transformation is the interceptor's responsibility)
+**AuthService 단위 테스트 — login**
 
 ### After That (in order)
 
-1. ChannelsService unit tests
-2. AuthService unit tests
-3. Auth integration tests
-4. Selective E2E tests
+1. Auth integration tests
+2. Selective E2E tests
 
 ---
 
