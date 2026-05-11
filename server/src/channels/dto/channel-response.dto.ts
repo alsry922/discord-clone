@@ -1,9 +1,7 @@
-import { Expose } from 'class-transformer';
-
 export class ChannelResponseDto {
-  @Expose() id: number;
-  @Expose() name: string;
-  @Expose() type: string;
-  @Expose() serverId: number;
-  @Expose() createdAt: Date;
+  id: number;
+  name: string;
+  type: string;
+  serverId: number;
+  createdAt: Date;
 }

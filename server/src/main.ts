@@ -1,6 +1,6 @@
-import { NestFactory, Reflector } from '@nestjs/core';
+import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { ClassSerializerInterceptor, ValidationPipe } from '@nestjs/common';
+import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { CorsOptions } from '@nestjs/common/interfaces/external/cors-options.interface';
 import { AllExceptionFilter } from './common/filters/all-exception.filter';
@@ -34,13 +34,6 @@ async function bootstrap() {
   //  이건 NestJS DI 컨테이너 밖에서 등록하는 방식임
   //  필터가 서비스 같은 걸 주입받을 필요가 있으면 DI 컨테이너 안에서 등록하는 방식인 APP_FILTER를 활용해야 함.
   app.useGlobalFilters(new AllExceptionFilter(), new HttpExceptionFilter());
-  app.useGlobalInterceptors(
-    new ClassSerializerInterceptor(app.get(Reflector), {
-      // note: Expose 데코레이터 있는 필드만 노출
-      excludeExtraneousValues: true, // 글로벌 기본값으로 설정
-    }),
-  );
-
   const config = new DocumentBuilder()
     .setTitle('Discord Clone API')
     .setVersion('1.0')
